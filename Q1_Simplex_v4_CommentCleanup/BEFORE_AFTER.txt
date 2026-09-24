@@ -1,0 +1,43 @@
+BEFORE/AFTER: SAME INPUT, SAME DEFAULT TOLERANCES
+V3 sha256: ef9ba04ee502843ce2e893feef1a50cec767ba12d1c585899234b2cf7efa83da
+V4 sha256: 4fc1f634390e6c9b263a43cab1b3f98637dfa26fbbfd987c74d15576f1ecd051
+All solutions below use ClassicalSimplex; alternative checks are disabled.
+
+fractional upper bound
+  Input: {'sense': 'max', 'A': [[1]], 'b': [2.375], 'c': [1], 'signs': ['<=']}
+  V3: status=OPTIMAL; x=[2.375]; objective=2.375; message=
+  V4: status=OPTIMAL; x=[2.375]; objective=2.375; message=
+
+one-third upper bound
+  Input: {'sense': 'max', 'A': [[3]], 'b': [1], 'c': [1], 'signs': ['<=']}
+  V3: status=OPTIMAL; x=[0.3333333333333333]; objective=0.3333333333333333; message=
+  V4: status=OPTIMAL; x=[0.3333333333333333]; objective=0.3333333333333333; message=
+
+nearly tied ratios
+  Input: {'sense': 'max', 'A': [[1], [1]], 'b': [1.0000000005, 1], 'c': [1], 'signs': ['<=', '<=']}
+  V3: status=OPTIMAL; x=[1.0000000005]; objective=1.0000000005; message=
+  V4: status=OPTIMAL; x=[1.0]; objective=1.0; message=
+
+close contradictory bounds
+  Input: {'sense': 'max', 'A': [[1], [1]], 'b': [1, 1.0000000005], 'c': [1], 'signs': ['<=', '>=']}
+  V3: status=OPTIMAL; x=[1.0]; objective=1.0; message=
+  V4: status=NUMERICAL_ERROR; x=None; objective=None; message=Phase I is inside the tolerance gray zone; feasibility is unconfirmed
+
+negative upper bound
+  Input: {'sense': 'max', 'A': [[1]], 'b': [-5e-10], 'c': [1], 'signs': ['<=']}
+  V3: status=OPTIMAL; x=[0.0]; objective=0.0; message=
+  V4: status=NUMERICAL_ERROR; x=None; objective=None; message=Phase I is inside the tolerance gray zone; feasibility is unconfirmed
+
+tiny cost plus large constant
+  Input: {'sense': 'max', 'A': [[1]], 'b': [1], 'c': [1e-300], 'signs': ['<='], 'objective_constant': 1e+100}
+  V3: status=NUMERICAL_ERROR; x=None; objective=None; message=Tableau structure or finite-number check failed
+  V4: status=OPTIMAL; x=[1.0]; objective=1e+100; message=
+
+Close contradictory bounds in V4 with both tolerances 1e-12:
+'INFEASIBLE'
+
+LIMITATION PROBE (not a success test):
+  Bounds 1 and 1+1e-15, ClassicalSimplex: OPTIMAL
+  Bounds 1 and 1+1e-15, GeneralizedSimplex: OPTIMAL
+At approximately machine-roundoff scale, a float solver can still accept an exactly
+infeasible model within its tolerances. V4 does not implement exact rational certification.

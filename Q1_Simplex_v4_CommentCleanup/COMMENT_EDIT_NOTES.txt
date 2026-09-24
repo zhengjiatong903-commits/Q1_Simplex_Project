@@ -1,0 +1,9 @@
+Comment cleanup of Q1_Simplex_Reviewed_v4
+
+Only standalone comments in simplex0.py were removed or shortened.
+Docstrings, executable statements, tolerances, interfaces and tests are unchanged.
+Important algorithm notes and selected pseudocode remain in English.
+PSEUDOCODE.txt is retained unchanged for the full explanation.
+The original v4 reports (TEST_LOG.txt, BEFORE_AFTER.txt, CHANGES.patch) are historical.
+See COMMENT_EDIT_TEST_LOG.txt for tests run after this comment-only edit.
+All numerical limits documented in README.md still apply.

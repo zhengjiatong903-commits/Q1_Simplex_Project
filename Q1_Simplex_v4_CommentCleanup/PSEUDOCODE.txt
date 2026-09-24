@@ -1,0 +1,98 @@
+Q1: actual call structure in reviewed v4
+
+All problem data, errors, examples and comments are in English.
+Internal convention: MAX; z + q*y = v; nonnegative working variables.
+M is a variable recovery map x = M*y, not a Big-M penalty.
+
+CLASS LPProblem
+    Store a copy of the original sense, A, b, c, signs and variable types.
+    Validate dimensions, finite real numbers and supported symbols.
+    Read equivalent structured input from Excel when requested.
+END CLASS
+
+CLASS SimplexBase
+    solve(check_alternatives, initial_basis):
+        Reset all previous state.
+        Validate, convert variable domains and scale the working LP.
+        Keep the objective constant OUT of tableau arithmetic.
+        Call the subclass's run_algorithm(initial_basis).
+        Verify the claimed result against the original model.
+        Recover original variables; add the original objective constant.
+        Optionally check for another ORIGINAL optimal solution.
+        Return the result or a distinct input/numerical/iteration-limit status.
+
+    iterate(rule, phase):
+        Check tableau structure and the stage-specific invariant.
+        Ask the rule for OPTIMAL, FEASIBLE, INFEASIBLE, UNBOUNDED, or PIVOT.
+        If PIVOT: call pivot and repeat. Otherwise stop this stage.
+
+    pivot(row, column):
+        Check the pivot magnitude and iteration limit.
+        Divide the pivot row by its pivot element.
+        Eliminate that column from every other row, including the objective.
+        Update basis, row-combination weights and iteration history.
+        Do not decimal-round the tableau.
+
+    choose_primal_pivot():
+        Require primal feasibility.
+        Select an improving nonbasic column by stable Bland ordering.
+        Find the true smallest eligible ratio.
+        Use roundoff-scale ties, not a broad feasibility epsilon.
+        Guard small blocking coefficients before claiming unboundedness.
+END CLASS
+
+CLASS ClassicalSimplex INHERITS SimplexBase
+    run_algorithm():
+        Make working RHS nonnegative; add slack/surplus/artificial columns.
+        If artificial variables exist:
+            Maximize minus their sum with primal pivots (Phase I).
+            Positive optimum above tolerance -> INFEASIBLE.
+            Nonzero gray-zone residual -> NUMERICAL_ERROR, not “zero”.
+            Clean zero artificial basics before deleting artificial columns.
+        Install the original VARIABLE objective with zero constant.
+        Run primal Phase II; verify its result.
+END CLASS
+
+CLASS DualSimplex INHERITS SimplexBase
+    run_algorithm(initial_basis):
+        Convert constraints to <= and add slacks; retain negative RHS values.
+        Rebuild a supplied basis from the current model, if any.
+        Require dual feasibility for the real objective or return INVALID_START.
+        Run strict dual pivots until all RHS values are feasible or a
+        contradictory row establishes infeasibility under numerical checks.
+
+    choose_dual_pivot(feasibility_only=False):
+        Select an eligible negative-RHS basic variable.
+        If strict dual: minimize q_j / (-a_rj) among negative row coefficients.
+        If feasibility-only: choose an eligible negative entry by stable ID,
+            equivalent to dual simplex for a zero auxiliary objective.
+        Return the pivot, a verified stopping condition, or numerical uncertainty.
+END CLASS
+
+CLASS GeneralizedSimplex INHERITS DualSimplex
+    run_algorithm(initial_basis):
+        Build a valid slack/supplied basis and install the real objective.
+        If dual feasible: run strict dual (possibly no pivots).
+        Otherwise:
+            If primal infeasible: perform feasibility-only repair pivots.
+            Once feasible: run primal simplex on the SAME tableau and basis.
+        Add no artificial variables on this main path.
+END CLASS
+
+SPECIAL RESULTS
+    Degenerate: record a near-zero basic value, by phase and at the final basis.
+    Alternatives: fix the primary optimum and vary each original coordinate;
+        confirm with another original point, not only a zero reduced cost.
+    Unbounded: verify a feasible point and an improving recession direction.
+    Infeasible: Phase I or a contradictory row, subject to numerical checks.
+    NUMERICAL_ERROR / INVALID_INPUT / INVALID_START / ITERATION_LIMIT:
+        keep these separate; do not relabel them as mathematical conclusions.
+
+PRESENTATION
+    Return full stored float values.
+    Format only printed copies; preserve scientific notation for small values.
+    Export stored numeric results and history, not rounded display strings.
+
+IMPORTANT
+    A float-based tolerance/roundoff policy is not an exact arithmetic proof.
+    Read README.md and BEFORE_AFTER.txt for the remaining boundary limitations.

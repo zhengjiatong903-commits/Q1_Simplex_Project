@@ -1,0 +1,702 @@
+--- v3/simplex0.py
++++ v4/simplex0.py
+@@ -1,29 +1,21 @@
+-"""Q1: Classical, Dual, and Generalized Simplex -- English teaching edition.
+-
+-This module extends the user's previous simplex0.py. It implements tableau
+-iterations directly; it never calls an external LP solver.
+-
+-Convention: internal MAX objective; last row = z + q*x = v; RHS is last column.
+-Primal feasibility means b_bar >= 0. Dual feasibility means q_N >= 0.
+-Classical: artificial-variable Two-Phase followed by primal simplex.
+-Dual: strict dual simplex, requiring a dual-feasible starting basis.
+-Generalized: Taha Section 4.4.2, feasibility-first tandem strategy. When both
+-conditions fail, ignore the real objective while repairing feasibility, then
+-apply primal simplex. This repair adds no artificial variables or constraints.
+-
+-The symbol M below is a VARIABLE MAPPING MATRIX, not a Big-M penalty.
+-English PSEUDOCODE comments explain the purpose of the main computational steps.
+-This floating-point educational solver is not an industrial LP package.
+-Numerically ambiguous cases can return NUMERICAL_ERROR, not a guessed answer.
+-
+-References: Taha, Operations Research: An Introduction, 10th ed., Sections
+-4.4.1-4.4.2. Implementation-specific choices and limitations are in README.md.
++"""Tableau LP solvers for Q1.
++
++Internal form: maximize, nonnegative working variables, RHS in the last column.
++The last row is z + q*y = v. Primal feasibility: RHS >= 0; dual: q_N >= 0.
++Classical uses Two-Phase. Dual requires a dual-feasible basis. Generalized uses
++Taha's feasibility-first combination of dual-style repair and primal simplex.
++
++Inputs and iterations use float64 without decimal rounding. Tolerances and
++roundoff guards are numerical policies, not exact-arithmetic certificates.
+ """
+ 
+ from copy import deepcopy
+ from dataclasses import dataclass
+ import numpy as np
+ import pandas as pd
++
++# A heuristic roundoff scale, not a rigorous forward-error bound.
++ROUNDING_GUARD = 64 * np.finfo(float).eps
+ 
+ 
+ class LPError(Exception):
+@@ -52,7 +44,7 @@
+         self.objective_constant = deepcopy(objective_constant)
+ 
+     def validate_and_parse(self):
+-        # PSEUDOCODE: copy input -> parse numbers and aliases -> check shapes
++        # Pseudocode: copy input -> parse numbers and aliases -> check shapes
+         # -> reject ambiguous/missing data -> return a validated LP.
+         """Return a validated copy without changing the original input."""
+         p = deepcopy(self)
+@@ -62,6 +54,10 @@
+                 "maximize": "max", "minimize": "min"
+             }.get(sense, sense)
+ 
++            for name in ("A", "b", "c", "objective_constant"):
++                raw = np.asarray(getattr(p, name))
++                if np.iscomplexobj(raw) or raw.dtype.kind == "b":
++                    raise ValueError(f"{name} must contain real numbers, not complex values or booleans")
+             p.c = np.asarray(p.c, dtype=float)
+             p.b = np.asarray(p.b, dtype=float)
+             p.A = np.asarray(p.A, dtype=float)
+@@ -173,7 +169,7 @@
+             raise ValueError("tolerance must be finite and positive")
+         if not np.isfinite(solution_tolerance) or solution_tolerance <= 0:
+             raise ValueError("solution_tolerance must be finite and positive")
+-        if not isinstance(max_iterations, int) or max_iterations < 0:
++        if isinstance(max_iterations, bool) or not isinstance(max_iterations, int) or max_iterations < 0:
+             raise ValueError("max_iterations must be a nonnegative integer")
+ 
+         self.original_problem = deepcopy(problem)
+@@ -205,13 +201,13 @@
+         self.initialization = None
+ 
+     def prepare_working_problem(self):
+-        # PSEUDOCODE: validate -> replace free/nonpositive variables -> scale
++        # Pseudocode: validate -> replace free/nonpositive variables -> scale
+         # rows and objective -> convert MIN to internal MAX -> retain recovery map.
+         self.p = self.original_problem.validate_and_parse()
+         p = self.p
+         columns = []
+ 
+-        # PSEUDOCODE: construct x = M*y with every internal variable y >= 0.
++        # M maps nonnegative working variables back to original variables: x = M*y.
+         for j, kind in enumerate(p.variable_types):
+             weights = {
+                 "nonnegative": [1],
+@@ -239,7 +235,7 @@
+ 
+         self.M = np.column_stack(columns)
+         self.n_work = self.M.shape[1]
+-        # PSEUDOCODE: scale each complete constraint by a positive divisor.
++        # Pseudocode: scale each complete constraint by a positive divisor.
+         # Do not floor the divisor at 1: tiny but valid rows must be scaled up.
+         self.constraint_scale = np.max(np.abs(p.A), axis=1)
+         zero_rows = self.constraint_scale == 0
+@@ -260,13 +256,16 @@
+         self.signs = p.signs.copy()
+         self.objective_sign = 1 if p.sense == "max" else -1
+ 
+-        # PSEUDOCODE: positively scale the objective and undo this scale on output.
++        # Scale only the variable objective; the constant is added after solving.
+         self.objective_scale = float(np.max(np.abs(p.c))) or 1.0
+         self.c_verify = p.c / self.objective_scale
+         self.c_work = self.objective_sign * (self.c_verify @ self.M)
+-        self.constant_work = (
+-            self.objective_sign * (p.objective_constant / self.objective_scale)
+-        )
++        # A constant changes the reported value, not the optimizer or any pivot.
++        self.constant_work = 0.0
++        if (np.any((p.A != 0) & (self.A_verify == 0))
++                or np.any((p.b != 0) & (self.b_verify == 0))
++                or np.any((p.c != 0) & (self.c_verify == 0))):
++            raise LPError("NUMERICAL_ERROR", "Scaling underflow erased a nonzero input; change units")
+         if self.objective_scale != 1.0:
+             self.transformations.append({
+                 "event": "SCALE_OBJECTIVE",
+@@ -328,7 +327,7 @@
+         })
+ 
+     def set_objective(self, cost, constant=0):
+-        # PSEUDOCODE: install z-cost*x=constant, then eliminate each basic
++        # Pseudocode: install z-cost*x=constant, then eliminate each basic
+         # variable from the objective equation using the current constraint rows.
+         self.T[-1] = np.r_[-np.asarray(cost), constant]
+         for i, column in enumerate(self.basis):
+@@ -338,7 +337,7 @@
+         self.record_state("SET_OBJECTIVE")
+ 
+     def pivot(self, row, column, theta=None):
+-        # PSEUDOCODE: check limit/pivot -> divide pivot row -> eliminate the
++        # Pseudocode: check limit/pivot -> divide pivot row -> eliminate the
+         # entering column in every other row -> update basis -> record a copy.
+         if self.iteration >= self.limit:
+             raise LPError("ITERATION_LIMIT", "The total pivot limit was reached")
+@@ -348,7 +347,6 @@
+ 
+         entering = self.variable_id(column)
+         leaving = self.variable_id(self.basis[row])
+-        # PSEUDOCODE: normalize the pivot row and its row-combination weights.
+         self.T[row] /= pivot_value
+         if self.row_transform is not None:
+             self.row_transform[row] /= pivot_value
+@@ -377,7 +375,7 @@
+         return None
+ 
+     def iterate(self, select_pivot, phase):
+-        # PSEUDOCODE: check structure and algorithm-specific invariant;
++        # Pseudocode: check structure and algorithm-specific invariant;
+         # ask the supplied rule for an action; stop or pivot; repeat.
+         self.phase = phase
+         self.record_state("INITIAL")
+@@ -403,36 +401,45 @@
+         return x, z
+ 
+     def verify_vector(self, vector, ray=False):
+-        """Verify an original feasible point, or a recession direction when ray=True."""
+-        p = self.p
++        """Check the unchanged original constraints through scaled equivalents."""
+         if not np.isfinite(vector).all():
+             raise LPError("NUMERICAL_ERROR", "The solution or direction contains nonfinite numbers")
+-
+-        # Verify against scaled equivalents of the ORIGINAL constraints.
+-        # A recession direction uses homogeneous constraints and no original RHS.
+         rhs = np.zeros_like(self.b_verify) if ray else self.b_verify
+         residual = self.A_verify @ vector - rhs
+         magnitude = np.abs(self.A_verify) @ np.abs(vector)
+-        if ray:
+-            tolerances = self.sol_eps * magnitude
+-        else:
+-            tolerances = self.sol_eps * (1 + np.abs(rhs) + magnitude)
+-
+-        for i, sign in enumerate(p.signs):
+-            value, tol = residual[i], tolerances[i]
+-            bad = (
+-                value > tol if sign == "<=" else
+-                value < -tol if sign == ">=" else
+-                abs(value) > tol
+-            )
+-            if bad:
+-                raise LPError("NUMERICAL_ERROR", f"Original constraint {i + 1} failed verification")
+-
+-        for value, kind in zip(vector, p.variable_types):
+-            tol = self.sol_eps * (abs(value) if ray else 1 + abs(value))
+-            if ((kind == "nonnegative" and value < -tol)
+-                    or (kind == "nonpositive" and value > tol)):
+-                raise LPError("NUMERICAL_ERROR", "Variable sign verification failed")
++        scale = magnitude if ray else 1 + np.abs(rhs) + magnitude
++        limits = self.sol_eps * scale
++        # A violation below the user tolerance is not automatically harmless.
++        # Larger-than-roundoff residuals in this gray zone trigger a guarded exit.
++        guards = np.minimum(limits, ROUNDING_GUARD * scale)
++        violations = np.array([
++            max(0.0, value) if sign == "<=" else
++            max(0.0, -value) if sign == ">=" else abs(value)
++            for value, sign in zip(residual, self.p.signs)
++        ])
++        if np.any(violations > limits):
++            raise LPError("NUMERICAL_ERROR", "A constraint residual exceeds the solution tolerance")
++        if np.any(violations > guards):
++            raise LPError("NUMERICAL_ERROR", "A constraint residual is in the tolerance gray zone; rescale or tighten tolerances")
++        sign_violations = []
++        for value, kind in zip(vector, self.p.variable_types):
++            violation = (max(0.0, -value) if kind == "nonnegative" else
++                         max(0.0, value) if kind == "nonpositive" else 0.0)
++            scale_v = abs(value) if ray else 1 + abs(value)
++            if violation > min(self.sol_eps, ROUNDING_GUARD) * scale_v:
++                raise LPError("NUMERICAL_ERROR", "A variable sign is uncertain or violated; do not round it to zero")
++            sign_violations.append(violation)
++        raw_rhs = np.zeros_like(self.p.b) if ray else self.p.b
++        raw_residual = self.p.A @ vector - raw_rhs
++        raw_violations = np.array([
++            max(0.0, v) if sign == "<=" else max(0.0, -v) if sign == ">=" else abs(v)
++            for v, sign in zip(raw_residual, self.p.signs)
++        ])
++        return {
++            "max_constraint_violation": float(np.max(raw_violations, initial=0.0)),
++            "max_scaled_constraint_violation": float(np.max(violations, initial=0.0)),
++            "max_variable_sign_violation": max(sign_violations, default=0.0),
++        }
+ 
+     def build_unbounded_ray(self, column):
+         d = np.zeros(self.T.shape[1] - 1)
+@@ -450,20 +457,31 @@
+         return {"point": x, "direction": direction}
+ 
+     def make_result(self, status, message="", certificate=None):
+-        # PSEUDOCODE: verify a claimed optimum against the original problem;
++        # Pseudocode: verify a claimed optimum against the original problem;
+         # recover original variables/value; add stage and degeneracy summaries.
+-        x = value = None
++        x = value = variable_value = None
++        numerical_report = {
++            "arithmetic": "float64",
++            "pivot_tolerance": self.eps,
++            "solution_tolerance": self.sol_eps,
++            "interpretation": "Tolerance-based result, not an exact-arithmetic certificate",
++        }
+         if status == "OPTIMAL":
+             if not all(self.feasibility_flags()):
+                 raise LPError("NUMERICAL_ERROR", "Final feasibility or optimality verification failed")
++            q = self.T[-1, self.nonbasic_columns()]
++            q_guard = np.minimum(self.eps, ROUNDING_GUARD * np.maximum(1.0, np.abs(q)))
++            if np.any(q < -q_guard):
++                raise LPError("NUMERICAL_ERROR", "A reduced cost is in the tolerance gray zone; optimality is unconfirmed")
+             x, value = self.extract_current_original_values()
+-            self.verify_vector(x)
+-            table_value = (
+-                self.objective_sign * self.objective_scale * self.T[-1, -1]
+-            )
+-            tol = self.sol_eps * (1 + abs(value) + abs(table_value))
+-            if not np.isfinite(value) or abs(value - table_value) > tol:
+-                raise LPError("NUMERICAL_ERROR", "Original objective disagrees with the tableau objective")
++            numerical_report.update(self.verify_vector(x))
++            variable_value = float(self.p.c @ x)
++            scaled_value = self.objective_sign * float(self.c_verify @ x)
++            table_value = float(self.T[-1, -1])
++            tol = self.sol_eps * (1 + abs(scaled_value) + abs(table_value))
++            if not np.isfinite(value) or abs(scaled_value - table_value) > tol:
++                raise LPError("NUMERICAL_ERROR", "Variable objective disagrees with the tableau objective")
++            numerical_report["scaled_objective_residual"] = abs(scaled_value - table_value)
+ 
+         phases = list(dict.fromkeys(
+             ["PHASE_I", "PHASE_I_CLEANUP", "PHASE_II"]
+@@ -488,6 +506,9 @@
+             "message": message,
+             "x": x,
+             "objective": value,
++            "objective_variable_part": variable_value,
++            "objective_constant": self.p.objective_constant if self.p else None,
++            "numerical_report": numerical_report,
+             "iterations": self.iteration,
+             "phase": self.phase,
+             "basis": [self.variable_id(j) for j in self.basis],
+@@ -553,7 +574,7 @@
+         # An export I/O error does not change the mathematical solve status.
+ 
+     def choose_primal_pivot(self):
+-        # PSEUDOCODE: require primal feasibility -> pick an improving nonbasic
++        # Pseudocode: require primal feasibility -> pick an improving nonbasic
+         # column -> minimum positive-coefficient ratio -> Bland tie-breaking.
+         # A missing blocking row is UNBOUNDED only when no positive entry exists.
+         if not self.feasibility_flags()[0]:
+@@ -594,12 +615,19 @@
+ 
+         ratios = np.maximum(rhs, 0) / self.T[rows, column]
+         theta = float(ratios.min())
+-        tied = rows[np.abs(ratios - theta) <= self.eps]
++        tie_tol = min(self.eps, ROUNDING_GUARD * max(1.0, abs(theta)))
++        small_rows = np.flatnonzero((self.T[:-1, column] > 0)
++                                    & (self.T[:-1, column] <= self.eps))
++        if len(small_rows):
++            small_ratios = np.maximum(self.T[small_rows, -1], 0) / self.T[small_rows, column]
++            if np.any(small_ratios < theta - tie_tol):
++                raise LPError("NUMERICAL_ERROR", "A small pivot could limit this step; change units")
++        tied = rows[np.abs(ratios - theta) <= tie_tol]
+         row = min(tied, key=lambda i: self.variable_id(self.basis[i]))
+         return Action("PIVOT", int(row), column, theta)
+ 
+     def confirm_alternative_optima(self, result):
+-        # PSEUDOCODE: fix the original optimal value -> minimize/maximize each
++        # Pseudocode: fix the original optimal value -> minimize/maximize each
+         # original coordinate -> return YES only with a different verified point.
+         # Auxiliary solves disable this check to prevent recursive checking.
+         """Check changes in ORIGINAL variables on the optimal face; avoid false multiplicity."""
+@@ -676,9 +704,33 @@
+             "auxiliary_iterations": auxiliary_iterations,
+         }
+ 
+-    def solve(self):
++    def add_alternative_check(self, result, check_alternatives):
++        if result["status"] == "OPTIMAL" and check_alternatives:
++            try:
++                with np.errstate(over="raise", divide="raise", invalid="raise"):
++                    result["alternative_info"] = self.confirm_alternative_optima(result)
++            except (LPError, FloatingPointError, OverflowError, np.linalg.LinAlgError) as exc:
++                result["alternative_info"] = {"status": "UNCONFIRMED", "details": str(exc)}
++        return result
++
++    def solve(self, check_alternatives=True, initial_basis=None):
++        """Shared entry point; subclasses supply run_algorithm(), not another wrapper."""
++        # Pseudocode: reset -> prepare input -> run chosen algorithm -> verify ->
++        # optionally check distinct optima. Keep mathematical and numerical failures separate.
+         self.reset()
+-        raise NotImplementedError("Instantiate ClassicalSimplex, DualSimplex, or GeneralizedSimplex")
++        try:
++            with np.errstate(over="raise", divide="raise", invalid="raise"):
++                self.prepare_working_problem()
++                status, certificate = self.run_algorithm(initial_basis)
++                result = self.make_result(status, certificate=certificate)
++        except LPError as exc:
++            return self.make_result(exc.status, str(exc))
++        except (FloatingPointError, OverflowError, np.linalg.LinAlgError) as exc:
++            return self.make_result("NUMERICAL_ERROR", str(exc))
++        return self.add_alternative_check(result, check_alternatives)
++
++    def run_algorithm(self, initial_basis=None):
++        raise NotImplementedError("Choose ClassicalSimplex, DualSimplex, or GeneralizedSimplex")
+ 
+ 
+ class ClassicalSimplex(SimplexBase):
+@@ -688,7 +740,7 @@
+             raise LPError("NUMERICAL_ERROR", "Primal feasibility was lost during a classical iteration")
+ 
+     def build_initial_tableau(self):
+-        # PSEUDOCODE: make RHS nonnegative; <= gets slack, >= gets surplus
++        # Pseudocode: make RHS nonnegative; <= gets slack, >= gets surplus
+         # and artificial, = gets artificial; record the initial identity basis.
+         A, b, signs = self.A.copy(), self.b.copy(), self.signs.copy()
+         m = len(b)
+@@ -743,7 +795,7 @@
+         return self.choose_primal_pivot()
+ 
+     def phase_one(self):
+-        # PSEUDOCODE: maximize minus the artificial sum using primal pivots;
++        # Pseudocode: maximize minus the artificial sum using primal pivots;
+         # a positive minimum sum proves infeasibility; otherwise clean the basis.
+         self.phase = "PHASE_I"
+         cost = np.zeros(self.T.shape[1] - 1)
+@@ -763,11 +815,14 @@
+             raise LPError("INFEASIBLE", "The optimal Phase I artificial-variable sum is positive")
+         if W < -self.eps:
+             raise LPError("NUMERICAL_ERROR", "The artificial-variable sum is unexpectedly negative")
+-
++        artificial_values = self.internal_values()[list(self.artificial)]
++        guards = np.minimum(self.eps, ROUNDING_GUARD * np.maximum(1.0, np.abs(artificial_values)))
++        if np.any(np.abs(artificial_values) > guards):
++            raise LPError("NUMERICAL_ERROR", "Phase I is inside the tolerance gray zone; feasibility is unconfirmed")
+         self.remove_artificial_variables()
+ 
+     def remove_artificial_variables(self):
+-        # PSEUDOCODE: pivot each zero artificial basic variable out; delete
++        # Pseudocode: pivot each zero artificial basic variable out; delete
+         # genuinely redundant rows if necessary; only then remove artificial columns.
+         self.phase = "PHASE_I_CLEANUP"
+ 
+@@ -776,8 +831,11 @@
+                 i for i, j in enumerate(self.basis) if j in self.artificial
+             )
+             rhs = float(self.T[row, -1])
+-            if abs(rhs) > self.eps:
+-                raise LPError("NUMERICAL_ERROR", "An artificial basic variable is not zero")
++            guard = min(self.eps, ROUNDING_GUARD * max(1.0, abs(rhs)))
++            if abs(rhs) > guard:
++                raise LPError("NUMERICAL_ERROR", "Artificial cleanup cannot discard this nonzero RHS")
++            # Only this local roundoff-level cleanup changes a number to zero.
++            # It is logged and the final point is checked against original input.
+             self.T[row, -1] = 0
+             self.record_state("NORMALIZE_RHS", row=row, old_rhs=rhs)
+ 
+@@ -796,8 +854,8 @@
+                     j for j in range(self.T.shape[1] - 1)
+                     if j not in self.artificial
+                 ]
+-                if np.any(np.abs(self.T[row, keep]) > self.eps):
+-                    raise LPError("NUMERICAL_ERROR", "Redundant-row verification failed")
++                if np.any(np.abs(self.T[row, keep]) > min(self.eps, ROUNDING_GUARD)):
++                    raise LPError("NUMERICAL_ERROR", "A small nonzero coefficient prevents deleting this row")
+                 self.T = np.delete(self.T, row, axis=0)
+                 del self.basis[row]
+                 self.transformations.append({
+@@ -826,44 +884,21 @@
+         self.validate_tableau_structure()
+         self.record_state("DELETE_ARTIFICIAL", removed=removed_ids)
+ 
+-    def solve(self, check_alternatives=True):
+-        # PSEUDOCODE: validate/transform -> build artificial basis if needed
+-        # -> Phase I -> restore real objective -> primal Phase II -> verify/output.
+-        self.reset()
+-        try:
+-            with np.errstate(over="raise", divide="raise", invalid="raise"):
+-                self.prepare_working_problem()
+-                self.initialization = "TWO_PHASE_OR_SLACK"
+-                self.build_initial_tableau()
+-                if self.artificial:
+-                    self.phase_one()
+-
+-                self.phase = "PHASE_II"
+-                self.set_objective(self.phase_two_cost, self.constant_work)
+-                status = self.iterate(self.choose_pivot, "PHASE_II")
+-                certificate = (
+-                    self.build_unbounded_ray(self.last_action.column)
+-                    if status == "UNBOUNDED" else None
+-                )
+-                result = self.make_result(status, certificate=certificate)
+-
+-        except LPError as exc:
+-            return self.make_result(exc.status, str(exc))
+-        except (FloatingPointError, OverflowError, np.linalg.LinAlgError) as exc:
+-            return self.make_result("NUMERICAL_ERROR", str(exc))
+-
+-        # Failure of the optional multiplicity check does not erase a verified optimum.
+-        if result["status"] == "OPTIMAL" and check_alternatives:
+-            try:
+-                with np.errstate(over="raise", divide="raise", invalid="raise"):
+-                    result["alternative_info"] = self.confirm_alternative_optima(
+-                        result
+-                    )
+-            except (LPError, FloatingPointError, OverflowError) as exc:
+-                result["alternative_info"] = {
+-                    "status": "UNCONFIRMED", "details": str(exc)
+-                }
+-        return result
++    def run_algorithm(self, initial_basis=None):
++        # Pseudocode: build a feasible augmented basis -> Phase I if needed ->
++        # remove artificial columns -> restore the variable objective -> primal simplex.
++        if initial_basis is not None:
++            raise LPError("INVALID_START", "Classical initializes with slacks/Two-Phase; a supplied basis is unsupported")
++        self.initialization = "TWO_PHASE_OR_SLACK"
++        self.build_initial_tableau()
++        if self.artificial:
++            self.phase_one()
++        self.phase = "PHASE_II"
++        self.set_objective(self.phase_two_cost, self.constant_work)
++        status = self.iterate(self.choose_pivot, "PHASE_II")
++        certificate = (self.build_unbounded_ray(self.last_action.column)
++                       if status == "UNBOUNDED" else None)
++        return status, certificate
+ 
+ 
+ class DualSimplex(SimplexBase):
+@@ -877,7 +912,7 @@
+     """
+ 
+     def build_slack_tableau(self, initial_basis=None):
+-        # PSEUDOCODE: <= stays unchanged; >= is reversed; = becomes two
++        # Pseudocode: <= stays unchanged; >= is reversed; = becomes two
+         # inequalities. Add an identity slack matrix WITHOUT making RHS positive.
+         rows, rhs, row_sources = [], [], []
+         for i, sign in enumerate(self.signs):
+@@ -915,7 +950,7 @@
+         self.basis = list(range(self.n_work, n))
+         self.initialization = "SLACK_BASIS"
+ 
+-        # PSEUDOCODE: when a basis is supplied, rebuild B^{-1}[A|b] from the
++        # Pseudocode: when a basis is supplied, rebuild B^{-1}[A|b] from the
+         # NEW original problem; never reuse a stale tableau after changing data.
+         if initial_basis is not None:
+             try:
+@@ -937,15 +972,15 @@
+         self.validate_tableau_structure()
+ 
+     def check_iteration_invariant(self):
+-        # PSEUDOCODE: dual simplex preserves the objective-row sign condition;
++        # Pseudocode: dual simplex preserves the objective-row sign condition;
+         # negative RHS entries are expected until the last iteration.
+         if not self.feasibility_flags()[1]:
+             raise LPError("NUMERICAL_ERROR", "Dual feasibility was lost during dual simplex")
+ 
+     def choose_dual_pivot(self, feasibility_only=False):
+-        # PSEUDOCODE (strict dual): require q_N >= 0; choose a negative-RHS row;
++        # Pseudocode (strict dual): require q_N >= 0; choose a negative-RHS row;
+         # among negative nonbasic entries minimize q_j/(-a_rj); pivot.
+-        # PSEUDOCODE (feasibility-only): ignore the real q row; choose the
++        # Pseudocode (feasibility-only): ignore the real q row; choose the
+         # smallest-ID eligible negative entry instead. This is equivalent to
+         # dual simplex for a ZERO auxiliary objective, retaining the real row.
+         if not feasibility_only and not self.feasibility_flags()[1]:
+@@ -953,9 +988,9 @@
+         negative_rows = np.flatnonzero(self.T[:-1, -1] < -self.eps)
+         if len(negative_rows) == 0:
+             # Distinguish a sign genuinely uncertain at the chosen tolerance.
+-            roundoff = 64 * np.finfo(float).eps * max(
+-                1.0, float(np.max(np.abs(self.T[:-1, -1]), initial=0.0))
+-            )
++            roundoff = np.minimum(self.eps, ROUNDING_GUARD * np.maximum(
++                1.0, np.abs(self.T[:-1, -1])
++            ))
+             if np.any(self.T[:-1, -1] < -roundoff):
+                 raise LPError("NUMERICAL_ERROR", "A negative basic value is too small to classify safely")
+             return Action("FEASIBLE" if feasibility_only else "OPTIMAL")
+@@ -979,7 +1014,7 @@
+                 for j in candidates
+             ])
+             theta = float(ratios.min())
+-            tie_tol = 64 * np.finfo(float).eps * max(1.0, abs(theta))
++            tie_tol = min(self.eps, ROUNDING_GUARD * max(1.0, abs(theta)))
+             tied = [j for j, ratio in zip(candidates, ratios)
+                     if abs(ratio - theta) <= tie_tol]
+             column = min(tied, key=self.variable_id)
+@@ -989,7 +1024,7 @@
+         return self.choose_dual_pivot(feasibility_only=False)
+ 
+     def build_infeasibility_certificate(self, row):
+-        # PSEUDOCODE: reproduce the final contradictory row from a linear
++        # Pseudocode: reproduce the final contradictory row from a linear
+         # combination of the original expanded equalities. Nonnegative variables
+         # cannot satisfy a nonnegative coefficient row with a negative RHS.
+         weights = self.row_transform[row].copy()
+@@ -1014,66 +1049,32 @@
+             "explanation": "Nonnegative variables cannot sum to the negative RHS of this row.",
+         }
+ 
+-    def add_alternative_check(self, result, check_alternatives):
+-        # PSEUDOCODE: retain a verified optimum even if the optional auxiliary
+-        # uniqueness check is numerically inconclusive.
+-        if result["status"] == "OPTIMAL" and check_alternatives:
+-            try:
+-                with np.errstate(over="raise", divide="raise", invalid="raise"):
+-                    result["alternative_info"] = self.confirm_alternative_optima(result)
+-            except (LPError, FloatingPointError, OverflowError, np.linalg.LinAlgError) as exc:
+-                result["alternative_info"] = {"status": "UNCONFIRMED", "details": str(exc)}
+-        return result
+-
+-    def solve(self, check_alternatives=True, initial_basis=None):
+-        # PSEUDOCODE: validate/transform -> slack tableau or supplied basis
+-        # -> install real objective -> REQUIRE dual feasibility -> strict dual
+-        # iterations -> verify optimum or infeasibility -> restore/output.
+-        self.reset()
+-        try:
+-            with np.errstate(over="raise", divide="raise", invalid="raise"):
+-                self.prepare_working_problem()
+-                self.build_slack_tableau(initial_basis)
+-                self.phase = "DUAL_START"
+-                self.set_objective(self.phase_two_cost, self.constant_work)
+-                primal, dual = self.feasibility_flags()
+-                self.initial_feasibility = {"primal": primal, "dual": dual}
+-                if not dual:
+-                    return self.make_result(
+-                        "INVALID_START",
+-                        "Strict dual simplex requires a dual-feasible starting basis. "
+-                        "Supply such a basis or use GeneralizedSimplex; "
+-                        "this status does NOT mean the LP is infeasible.",
+-                    )
+-                status = self.iterate(self.choose_pivot, "DUAL")
+-                certificate = (
+-                    self.build_infeasibility_certificate(self.last_action.row)
+-                    if status == "INFEASIBLE" else None
+-                )
+-                result = self.make_result(status, certificate=certificate)
+-        except LPError as exc:
+-            return self.make_result(exc.status, str(exc))
+-        except (FloatingPointError, OverflowError, np.linalg.LinAlgError) as exc:
+-            return self.make_result("NUMERICAL_ERROR", str(exc))
+-        return self.add_alternative_check(result, check_alternatives)
++
++    def initialize_dual_basis(self, initial_basis, phase):
++        self.build_slack_tableau(initial_basis)
++        self.phase = phase
++        self.set_objective(self.phase_two_cost, self.constant_work)
++        primal, dual = self.feasibility_flags()
++        self.initial_feasibility = {"primal": primal, "dual": dual}
++        return primal, dual
++
++    def run_algorithm(self, initial_basis=None):
++        # Pseudocode: build/rebuild a basis -> require dual feasibility -> use dual
++        # ratio pivots until primal feasibility is restored or a contradiction is found.
++        _, dual = self.initialize_dual_basis(initial_basis, "DUAL_START")
++        if not dual:
++            raise LPError("INVALID_START", "Strict dual simplex requires a dual-feasible basis; use a valid basis or GeneralizedSimplex")
++        status = self.iterate(self.choose_pivot, "DUAL")
++        certificate = (self.build_infeasibility_certificate(self.last_action.row)
++                       if status == "INFEASIBLE" else None)
++        return status, certificate
+ 
+ 
+ class GeneralizedSimplex(DualSimplex):
+-    """Taha's feasibility-first generalized method, implemented by inheritance.
+-
+-    Reuse DualSimplex's slack builder and negative-RHS repair operations and
+-    SimplexBase's primal pivot operation. Do not call ClassicalSimplex.solve()
+-    to disguise an unimplemented generalized algorithm.
+-
+-    If initially dual feasible, use true dual simplex. Otherwise, repair any
+-    primal infeasibility without preserving the REAL objective's sign condition,
+-    then use primal simplex on the SAME tableau with the REAL objective row.
+-    Feasibility-only pivots use Bland ordering and correspond to dual simplex
+-    on an identically zero auxiliary objective; no artificial variables are added.
+-    """
++    """Taha's feasibility-first method; reuse dual repair and primal pivots."""
+ 
+     def check_iteration_invariant(self):
+-        # PSEUDOCODE: requirements depend on the active stage, not on the class
++        # Pseudocode: requirements depend on the active stage, not on the class
+         # name alone. The feasibility-only stage can have both flags False.
+         if self.phase == "GENERALIZED_DUAL":
+             DualSimplex.check_iteration_invariant(self)
+@@ -1085,7 +1086,7 @@
+             return None
+ 
+     def choose_pivot(self):
+-        # PSEUDOCODE: reuse the appropriate mathematical rule for this stage.
++        # Pseudocode: reuse the appropriate mathematical rule for this stage.
+         if self.phase == "GENERALIZED_DUAL":
+             return self.choose_dual_pivot(feasibility_only=False)
+         if self.phase == "GENERALIZED_FEASIBILITY":
+@@ -1094,53 +1095,30 @@
+             return self.choose_primal_pivot()
+         raise LPError("INVALID_START", "Generalized simplex has no active iteration stage")
+ 
+-    def solve(self, check_alternatives=True, initial_basis=None):
+-        # PSEUDOCODE:
+-        # 1. Build a valid basis, not necessarily primal or dual feasible.
+-        # 2. If both conditions hold, verify and finish.
+-        # 3. If only dual feasible, apply strict dual simplex.
+-        # 4. If neither holds, use objective-independent feasibility pivots.
+-        # 5. Once primal feasible, apply primal simplex on the current tableau.
+-        # 6. Verify the result, classify special cases, and recover original x.
+-        self.reset()
+-        try:
+-            with np.errstate(over="raise", divide="raise", invalid="raise"):
+-                self.prepare_working_problem()
+-                self.build_slack_tableau(initial_basis)
+-                self.phase = "GENERALIZED_START"
++    def run_algorithm(self, initial_basis=None):
++        # Pseudocode: if dual feasible, use strict dual. Otherwise repair negative
++        # RHS values without requiring real-objective dual feasibility; then run
++        # primal simplex on the same basis. No artificial variables are added.
++        primal, dual = self.initialize_dual_basis(initial_basis, "GENERALIZED_START")
++        if dual:
++            status = self.iterate(self.choose_pivot, "GENERALIZED_DUAL")
++        else:
++            status = ("FEASIBLE" if primal else
++                      self.iterate(self.choose_pivot, "GENERALIZED_FEASIBILITY"))
++            if status == "FEASIBLE":
++                self.phase = "GENERALIZED_PRIMAL"
+                 self.set_objective(self.phase_two_cost, self.constant_work)
+-                primal, dual = self.feasibility_flags()
+-                self.initial_feasibility = {"primal": primal, "dual": dual}
+-
+-                if dual:
+-                    # Includes the already-optimal case: zero pivots are needed.
+-                    status = self.iterate(self.choose_pivot, "GENERALIZED_DUAL")
+-                else:
+-                    status = "FEASIBLE" if primal else self.iterate(
+-                        self.choose_pivot, "GENERALIZED_FEASIBILITY"
+-                    )
+-                    if status == "FEASIBLE":
+-                        # Keep all successful basis changes. No rebuild and no
+-                        # call to artificial-variable Phase I are needed.
+-                        self.phase = "GENERALIZED_PRIMAL"
+-                        self.set_objective(self.phase_two_cost, self.constant_work)
+-                        status = self.iterate(self.choose_pivot, "GENERALIZED_PRIMAL")
+-
+-                certificate = None
+-                if status == "INFEASIBLE":
+-                    certificate = self.build_infeasibility_certificate(self.last_action.row)
+-                elif status == "UNBOUNDED":
+-                    certificate = self.build_unbounded_ray(self.last_action.column)
+-                result = self.make_result(status, certificate=certificate)
+-        except LPError as exc:
+-            return self.make_result(exc.status, str(exc))
+-        except (FloatingPointError, OverflowError, np.linalg.LinAlgError) as exc:
+-            return self.make_result("NUMERICAL_ERROR", str(exc))
+-        return self.add_alternative_check(result, check_alternatives)
++                status = self.iterate(self.choose_pivot, "GENERALIZED_PRIMAL")
++        certificate = None
++        if status == "INFEASIBLE":
++            certificate = self.build_infeasibility_certificate(self.last_action.row)
++        elif status == "UNBOUNDED":
++            certificate = self.build_unbounded_ray(self.last_action.column)
++        return status, certificate
+ 
+ 
+ if __name__ == "__main__":
+-    # PSEUDOCODE: change only problem data to solve another LP.
++    # Example: Taha, Section 4.4.2.
+     problem = LPProblem(
+         sense="max",
+         A=[[-1, 2, -2], [-1, 1, 1], [2, -1, 4]],

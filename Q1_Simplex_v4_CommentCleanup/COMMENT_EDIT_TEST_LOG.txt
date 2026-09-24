@@ -1,0 +1,117 @@
+Comment-only cleanup validation
+Base: Q1_Simplex_Reviewed_v4
+Changed file: simplex0.py (standalone comments only)
+Comment lines: 74 -> 32
+AST, including all docstrings: identical to v4
+Non-comment token sequence: identical to v4
+
+COMMAND: python3 test_simplex.py
+EXIT CODE: 0
+ELAPSED SECONDS: 0.650
+PASS 01 | ClassicalSimplex     | bounded max: OPTIMAL
+PASS 02 | ClassicalSimplex     | min with >=: OPTIMAL
+PASS 03 | ClassicalSimplex     | negative RHS: OPTIMAL
+PASS 04 | ClassicalSimplex     | mixed equality and inequalities: OPTIMAL
+PASS 05 | ClassicalSimplex     | free variable; original optimum unique: OPTIMAL
+PASS 06 | ClassicalSimplex     | nonpositive variable and constant: OPTIMAL
+PASS 07 | ClassicalSimplex     | infeasible: INFEASIBLE
+PASS 08 | ClassicalSimplex     | unbounded without rows: UNBOUNDED
+PASS 09 | ClassicalSimplex     | unbounded after feasible-start repair: UNBOUNDED
+PASS 10 | ClassicalSimplex     | duplicate equalities: OPTIMAL
+PASS 11 | ClassicalSimplex     | different optimal points: OPTIMAL
+PASS 12 | ClassicalSimplex     | degenerate but unique original optimum: OPTIMAL
+PASS 13 | ClassicalSimplex     | constant objective, multiple points: OPTIMAL
+PASS 14 | ClassicalSimplex     | NaN input: INVALID_INPUT
+PASS 15 | ClassicalSimplex     | strict inequality is not silently replaced: INVALID_INPUT
+PASS 16 | ClassicalSimplex     | shape mismatch: INVALID_INPUT
+PASS 17 | ClassicalSimplex     | pivot limit: ITERATION_LIMIT
+PASS 18 | ClassicalSimplex     | scaled tiny row: OPTIMAL
+PASS 19 | ClassicalSimplex     | scaled tiny objective: OPTIMAL
+PASS 20 | ClassicalSimplex     | contradictory zero row: INFEASIBLE
+PASS 21 | ClassicalSimplex     | two free variables retain correct indices: OPTIMAL
+PASS 22 | ClassicalSimplex     | Beale cycling example with Bland ordering: OPTIMAL
+PASS 23 | GeneralizedSimplex   | bounded max: OPTIMAL
+PASS 24 | GeneralizedSimplex   | min with >=: OPTIMAL
+PASS 25 | GeneralizedSimplex   | negative RHS: OPTIMAL
+PASS 26 | GeneralizedSimplex   | mixed equality and inequalities: OPTIMAL
+PASS 27 | GeneralizedSimplex   | free variable; original optimum unique: OPTIMAL
+PASS 28 | GeneralizedSimplex   | nonpositive variable and constant: OPTIMAL
+PASS 29 | GeneralizedSimplex   | infeasible: INFEASIBLE
+PASS 30 | GeneralizedSimplex   | unbounded without rows: UNBOUNDED
+PASS 31 | GeneralizedSimplex   | unbounded after feasible-start repair: UNBOUNDED
+PASS 32 | GeneralizedSimplex   | duplicate equalities: OPTIMAL
+PASS 33 | GeneralizedSimplex   | different optimal points: OPTIMAL
+PASS 34 | GeneralizedSimplex   | degenerate but unique original optimum: OPTIMAL
+PASS 35 | GeneralizedSimplex   | constant objective, multiple points: OPTIMAL
+PASS 36 | GeneralizedSimplex   | NaN input: INVALID_INPUT
+PASS 37 | GeneralizedSimplex   | strict inequality is not silently replaced: INVALID_INPUT
+PASS 38 | GeneralizedSimplex   | shape mismatch: INVALID_INPUT
+PASS 39 | GeneralizedSimplex   | pivot limit: ITERATION_LIMIT
+PASS 40 | GeneralizedSimplex   | scaled tiny row: OPTIMAL
+PASS 41 | GeneralizedSimplex   | scaled tiny objective: OPTIMAL
+PASS 42 | GeneralizedSimplex   | contradictory zero row: INFEASIBLE
+PASS 43 | GeneralizedSimplex   | two free variables retain correct indices: OPTIMAL
+PASS 44 | GeneralizedSimplex   | Beale cycling example with Bland ordering: OPTIMAL
+PASS 45 | DualSimplex          | Taha Example 4.4-1: OPTIMAL
+PASS 46 | GeneralizedSimplex   | Taha Example 4.4-1: OPTIMAL
+PASS 47 | GeneralizedSimplex   | Taha Example 4.4-2: OPTIMAL
+PASS 48 | DualSimplex          | strict dual must reject non-dual-feasible basis: INVALID_START
+PASS 49 | DualSimplex          | multiple dual pivots preserve only dual feasibility: OPTIMAL
+PASS 50 | DualSimplex          | dual infeasibility certificate: INFEASIBLE
+PASS 51 | DualSimplex          | dual equality expansion: OPTIMAL
+PASS 52 | DualSimplex          | dual optimal alternatives: OPTIMAL
+PASS 53 | DualSimplex          | dual initially optimal with zero pivots: OPTIMAL
+PASS 54 | DualSimplex          | dual iteration cap: ITERATION_LIMIT
+PASS 55 | DualSimplex          | duplicate initial basis is rejected: INVALID_START
+PASS 56 | DualSimplex          | singular initial basis is rejected: INVALID_START
+PASS 57 | DualSimplex          | user-supplied dual-feasible basis: OPTIMAL
+PASS 58 | GeneralizedSimplex   | multiple dual pivots preserve only dual feasibility: OPTIMAL
+PASS 59 | GeneralizedSimplex   | dual infeasibility certificate: INFEASIBLE
+PASS 60 | GeneralizedSimplex   | dual equality expansion: OPTIMAL
+PASS 61 | GeneralizedSimplex   | dual optimal alternatives: OPTIMAL
+PASS 62 | GeneralizedSimplex   | dual initially optimal with zero pivots: OPTIMAL
+PASS 63 | GeneralizedSimplex   | dual iteration cap: ITERATION_LIMIT
+PASS 64 | GeneralizedSimplex   | duplicate initial basis is rejected: INVALID_START
+PASS 65 | GeneralizedSimplex   | singular initial basis is rejected: INVALID_START
+PASS 66 | GeneralizedSimplex   | user-supplied dual-feasible basis: OPTIMAL
+PASS 67 | DualSimplex          | RHS change makes old dual-feasible basis infeasible: INFEASIBLE
+
+Completed 67 deterministic solve cases; 717 assertions passed.
+Cases by solver: {'ClassicalSimplex': 22, 'GeneralizedSimplex': 33, 'DualSimplex': 12}
+
+
+COMMAND: python3 test_numeric_boundaries.py
+EXIT CODE: 0
+ELAPSED SECONDS: 0.676
+Counted helper solves: 52; additional direct API calls are covered by named tests.
+test_close_ratios_are_not_feasibility_ties (__main__.NumericBoundaryTests.test_close_ratios_are_not_feasibility_ties) ... ok
+test_common_solve_is_inherited_not_copied (__main__.NumericBoundaryTests.test_common_solve_is_inherited_not_copied) ... ok
+test_computation_does_not_call_decimal_rounding (__main__.NumericBoundaryTests.test_computation_does_not_call_decimal_rounding) ... ok
+test_conflicting_close_bounds_are_not_called_optimal (__main__.NumericBoundaryTests.test_conflicting_close_bounds_are_not_called_optimal) ... ok
+test_display_keeps_returned_values_unchanged (__main__.NumericBoundaryTests.test_display_keeps_returned_values_unchanged) ... ok
+test_fractional_bounds_are_not_rounded (__main__.NumericBoundaryTests.test_fractional_bounds_are_not_rounded) ... ok
+test_fractional_lower_bounds_all_algorithms (__main__.NumericBoundaryTests.test_fractional_lower_bounds_all_algorithms) ... ok
+test_negative_upper_bound_is_not_zeroed (__main__.NumericBoundaryTests.test_negative_upper_bound_is_not_zeroed) ... ok
+test_objective_constant_is_not_pivoted (__main__.NumericBoundaryTests.test_objective_constant_is_not_pivoted) ... ok
+test_one_third_is_not_replaced_by_two_decimals (__main__.NumericBoundaryTests.test_one_third_is_not_replaced_by_two_decimals) ... ok
+test_problem_data_remains_unchanged (__main__.NumericBoundaryTests.test_problem_data_remains_unchanged) ... ok
+test_result_has_residual_report (__main__.NumericBoundaryTests.test_result_has_residual_report) ... ok
+test_significant_coefficient_underflow_is_guarded (__main__.NumericBoundaryTests.test_significant_coefficient_underflow_is_guarded) ... ok
+test_small_negative_reduced_cost_is_not_silently_optimal (__main__.NumericBoundaryTests.test_small_negative_reduced_cost_is_not_silently_optimal) ... ok
+test_small_valid_bound_with_suitable_tolerance (__main__.NumericBoundaryTests.test_small_valid_bound_with_suitable_tolerance) ... ok
+test_whole_row_scaling_does_not_change_bound (__main__.NumericBoundaryTests.test_whole_row_scaling_does_not_change_bound) ... ok
+
+----------------------------------------------------------------------
+Ran 16 tests in 0.047s
+
+OK
+
+
+COMMAND: python3 test_excel.py
+EXIT CODE: 0
+ELAPSED SECONDS: 0.876
+PASS Excel input/export: ClassicalSimplex
+PASS Excel input/export: GeneralizedSimplex
+PASS Excel export: DualSimplex
+Completed 3 Excel workflow checks.
+

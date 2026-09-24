@@ -1,0 +1,14 @@
+{
+  "base_version": "Q1_Simplex_Reviewed_v4",
+  "changed_python_files": [
+    "simplex0.py"
+  ],
+  "comment_lines_before": 74,
+  "comment_lines_after": 32,
+  "total_lines_before": 1140,
+  "total_lines_after": 1098,
+  "ast_identical_including_docstrings": true,
+  "noncomment_tokens_identical": true,
+  "source_sha256": "4fc1f634390e6c9b263a43cab1b3f98637dfa26fbbfd987c74d15576f1ecd051",
+  "edited_sha256": "4c072e7731795158503661ae842725866bb07d2355e66a64ad45686751fb5795"
+}

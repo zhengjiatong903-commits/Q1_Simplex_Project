@@ -1,0 +1,595 @@
+[
+  {
+    "case": "scaled/15",
+    "algorithm": "ClassicalSimplex",
+    "expected": "UNBOUNDED",
+    "message": "The entering column has tiny positive entries; unboundedness is uncertain",
+    "problem": {
+      "sense": "max",
+      "A": [
+        [
+          -2.9999999999999997e-05,
+          -4.9999999999999996e-05,
+          1.9999999999999998e-05
+        ],
+        [
+          3.9999999999999996e-05,
+          4.9999999999999996e-05,
+          1.9999999999999998e-05
+        ],
+        [
+          4.0,
+          5.0,
+          3.0
+        ],
+        [
+          0.0,
+          -3.0,
+          -2.0
+        ],
+        [
+          5e-10,
+          0.0,
+          -1e-10
+        ],
+        [
+          -200000.0,
+          -400000.0,
+          -200000.0
+        ]
+      ],
+      "b": [
+        0.0,
+        7.999999999999999e-05,
+        10.0,
+        -5.0,
+        1e-09,
+        -600000.0
+      ],
+      "c": [
+        4.9999999999999996e-06,
+        2e-06,
+        0.0
+      ],
+      "signs": [
+        "<=",
+        ">=",
+        ">=",
+        "<=",
+        "<=",
+        "<="
+      ],
+      "variable_types": [
+        "nonpositive",
+        "nonnegative",
+        "nonnegative"
+      ],
+      "objective_constant": -2e-06
+    }
+  },
+  {
+    "case": "mixed/137",
+    "algorithm": "GeneralizedSimplex",
+    "expected": "UNBOUNDED",
+    "message": "The entering column has tiny positive entries; unboundedness is uncertain",
+    "problem": {
+      "sense": "max",
+      "A": [
+        [
+          -1.0,
+          -3.0,
+          -3.0,
+          -2.0
+        ],
+        [
+          3.0,
+          0.0,
+          -2.0,
+          0.0
+        ],
+        [
+          3.0,
+          -1.0,
+          3.0,
+          5.0
+        ],
+        [
+          3.0,
+          -4.0,
+          -4.0,
+          2.0
+        ]
+      ],
+      "b": [
+        -3.0,
+        -6.0,
+        9.0,
+        -1.0
+      ],
+      "c": [
+        1,
+        2,
+        -5,
+        -2
+      ],
+      "signs": [
+        "<=",
+        "<=",
+        ">=",
+        "<="
+      ],
+      "variable_types": [
+        "nonpositive",
+        "nonnegative",
+        "nonnegative",
+        "nonnegative"
+      ],
+      "objective_constant": -3.0
+    }
+  },
+  {
+    "case": "mixed/141",
+    "algorithm": "GeneralizedSimplex",
+    "expected": "INFEASIBLE",
+    "message": "Tiny negative row entries prevent a reliable infeasibility claim",
+    "problem": {
+      "sense": "min",
+      "A": [
+        [
+          -3.0,
+          -3.0,
+          0.0,
+          4.0,
+          -5.0
+        ],
+        [
+          2.0,
+          -4.0,
+          -5.0,
+          3.0,
+          -2.0
+        ],
+        [
+          5.0,
+          2.0,
+          1.0,
+          2.0,
+          4.0
+        ],
+        [
+          5.0,
+          0.0,
+          -3.0,
+          1.0,
+          4.0
+        ],
+        [
+          0.0,
+          3.0,
+          -2.0,
+          -4.0,
+          0.0
+        ],
+        [
+          -2.0,
+          -4.0,
+          -2.0,
+          -2.0,
+          -3.0
+        ],
+        [
+          0.0,
+          5.0,
+          -1.0,
+          1.0,
+          -3.0
+        ]
+      ],
+      "b": [
+        9.0,
+        2.0,
+        -6.0,
+        -3.0,
+        -4.0,
+        1.0,
+        9.0
+      ],
+      "c": [
+        -4,
+        3,
+        -2,
+        2,
+        -2
+      ],
+      "signs": [
+        ">=",
+        ">=",
+        ">=",
+        ">=",
+        ">=",
+        ">=",
+        ">="
+      ],
+      "variable_types": [
+        "nonnegative",
+        "nonnegative",
+        "nonnegative",
+        "nonnegative",
+        "nonnegative"
+      ],
+      "objective_constant": 1.0
+    }
+  },
+  {
+    "case": "mixed/175",
+    "algorithm": "ClassicalSimplex",
+    "expected": "UNBOUNDED",
+    "message": "A constraint residual exceeds the solution tolerance",
+    "problem": {
+      "sense": "min",
+      "A": [
+        [
+          0.0,
+          3.0,
+          -4.0,
+          -4.0,
+          5.0
+        ],
+        [
+          -3.0,
+          3.0,
+          1.0,
+          -3.0,
+          -3.0
+        ],
+        [
+          -1.0,
+          -1.0,
+          -4.0,
+          -3.0,
+          5.0
+        ],
+        [
+          -4.0,
+          0.0,
+          0.0,
+          -3.0,
+          -2.0
+        ],
+        [
+          -1.0,
+          2.0,
+          -1.0,
+          -2.0,
+          -1.0
+        ],
+        [
+          1.0,
+          0.0,
+          1.0,
+          5.0,
+          -1.0
+        ],
+        [
+          -2.0,
+          -2.0,
+          -3.0,
+          -2.0,
+          -1.0
+        ]
+      ],
+      "b": [
+        -7.0,
+        0.0,
+        1.0,
+        -6.0,
+        -1.0,
+        10.0,
+        6.0
+      ],
+      "c": [
+        -5,
+        4,
+        -4,
+        -4,
+        0
+      ],
+      "signs": [
+        "<=",
+        "<=",
+        "<=",
+        "=",
+        "<=",
+        ">=",
+        "<="
+      ],
+      "variable_types": [
+        "nonnegative",
+        "free",
+        "nonnegative",
+        "nonnegative",
+        "nonnegative"
+      ],
+      "objective_constant": -3.0
+    }
+  },
+  {
+    "case": "mixed/175",
+    "algorithm": "GeneralizedSimplex",
+    "expected": "UNBOUNDED",
+    "message": "A constraint residual exceeds the solution tolerance",
+    "problem": {
+      "sense": "min",
+      "A": [
+        [
+          0.0,
+          3.0,
+          -4.0,
+          -4.0,
+          5.0
+        ],
+        [
+          -3.0,
+          3.0,
+          1.0,
+          -3.0,
+          -3.0
+        ],
+        [
+          -1.0,
+          -1.0,
+          -4.0,
+          -3.0,
+          5.0
+        ],
+        [
+          -4.0,
+          0.0,
+          0.0,
+          -3.0,
+          -2.0
+        ],
+        [
+          -1.0,
+          2.0,
+          -1.0,
+          -2.0,
+          -1.0
+        ],
+        [
+          1.0,
+          0.0,
+          1.0,
+          5.0,
+          -1.0
+        ],
+        [
+          -2.0,
+          -2.0,
+          -3.0,
+          -2.0,
+          -1.0
+        ]
+      ],
+      "b": [
+        -7.0,
+        0.0,
+        1.0,
+        -6.0,
+        -1.0,
+        10.0,
+        6.0
+      ],
+      "c": [
+        -5,
+        4,
+        -4,
+        -4,
+        0
+      ],
+      "signs": [
+        "<=",
+        "<=",
+        "<=",
+        "=",
+        "<=",
+        ">=",
+        "<="
+      ],
+      "variable_types": [
+        "nonnegative",
+        "free",
+        "nonnegative",
+        "nonnegative",
+        "nonnegative"
+      ],
+      "objective_constant": -3.0
+    }
+  },
+  {
+    "case": "scaled/175",
+    "algorithm": "ClassicalSimplex",
+    "expected": "UNBOUNDED",
+    "message": "A constraint residual exceeds the solution tolerance",
+    "problem": {
+      "sense": "min",
+      "A": [
+        [
+          0.0,
+          3.0,
+          -4.0,
+          -4.0,
+          5.0
+        ],
+        [
+          -3e-10,
+          3e-10,
+          1e-10,
+          -3e-10,
+          -3e-10
+        ],
+        [
+          -10000000000.0,
+          -10000000000.0,
+          -40000000000.0,
+          -30000000000.0,
+          50000000000.0
+        ],
+        [
+          -400000.0,
+          0.0,
+          0.0,
+          -300000.0,
+          -200000.0
+        ],
+        [
+          -1e-10,
+          2e-10,
+          -1e-10,
+          -2e-10,
+          -1e-10
+        ],
+        [
+          9.999999999999999e-06,
+          0.0,
+          9.999999999999999e-06,
+          4.9999999999999996e-05,
+          -9.999999999999999e-06
+        ],
+        [
+          -200000.0,
+          -200000.0,
+          -300000.0,
+          -200000.0,
+          -100000.0
+        ]
+      ],
+      "b": [
+        -7.0,
+        0.0,
+        10000000000.0,
+        -600000.0,
+        -1e-10,
+        9.999999999999999e-05,
+        600000.0
+      ],
+      "c": [
+        -4.9999999999999996e-06,
+        4e-06,
+        -4e-06,
+        -4e-06,
+        0.0
+      ],
+      "signs": [
+        "<=",
+        "<=",
+        "<=",
+        "=",
+        "<=",
+        ">=",
+        "<="
+      ],
+      "variable_types": [
+        "nonnegative",
+        "free",
+        "nonnegative",
+        "nonnegative",
+        "nonnegative"
+      ],
+      "objective_constant": -3e-06
+    }
+  },
+  {
+    "case": "scaled/175",
+    "algorithm": "GeneralizedSimplex",
+    "expected": "UNBOUNDED",
+    "message": "A constraint residual exceeds the solution tolerance",
+    "problem": {
+      "sense": "min",
+      "A": [
+        [
+          0.0,
+          3.0,
+          -4.0,
+          -4.0,
+          5.0
+        ],
+        [
+          -3e-10,
+          3e-10,
+          1e-10,
+          -3e-10,
+          -3e-10
+        ],
+        [
+          -10000000000.0,
+          -10000000000.0,
+          -40000000000.0,
+          -30000000000.0,
+          50000000000.0
+        ],
+        [
+          -400000.0,
+          0.0,
+          0.0,
+          -300000.0,
+          -200000.0
+        ],
+        [
+          -1e-10,
+          2e-10,
+          -1e-10,
+          -2e-10,
+          -1e-10
+        ],
+        [
+          9.999999999999999e-06,
+          0.0,
+          9.999999999999999e-06,
+          4.9999999999999996e-05,
+          -9.999999999999999e-06
+        ],
+        [
+          -200000.0,
+          -200000.0,
+          -300000.0,
+          -200000.0,
+          -100000.0
+        ]
+      ],
+      "b": [
+        -7.0,
+        0.0,
+        10000000000.0,
+        -600000.0,
+        -1e-10,
+        9.999999999999999e-05,
+        600000.0
+      ],
+      "c": [
+        -4.9999999999999996e-06,
+        4e-06,
+        -4e-06,
+        -4e-06,
+        0.0
+      ],
+      "signs": [
+        "<=",
+        "<=",
+        "<=",
+        "=",
+        "<=",
+        ">=",
+        "<="
+      ],
+      "variable_types": [
+        "nonnegative",
+        "free",
+        "nonnegative",
+        "nonnegative",
+        "nonnegative"
+      ],
+      "objective_constant": -3e-06
+    }
+  }
+]
